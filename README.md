@@ -38,3 +38,15 @@ A desktop application for modular, node-based image manipulation. This tool allo
 ```bash
 git clone https://github.com/SaanidhyaM/node-based-image-processor.git
 cd node-based-image-processor
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+### 3. Run the app
+
+```bash
+python main.py
+```
