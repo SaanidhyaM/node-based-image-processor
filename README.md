@@ -31,10 +31,6 @@ A desktop application for modular, node-based image manipulation. This tool allo
 
 ---
 
-> [Add screenshots here once UI is functional]
-
----
-
 ## 🛠️ How to Run
 
 ### 1. Clone the repository
