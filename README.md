@@ -31,8 +31,6 @@ A desktop application for modular, node-based image manipulation. This tool allo
 
 ---
 
-## 🖥️ Interface Preview
-
 > [Add screenshots here once UI is functional]
 
 ---
