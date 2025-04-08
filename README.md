@@ -42,5 +42,5 @@ A desktop application for modular, node-based image manipulation. This tool allo
 ### 1. Clone the repository
 
 ```bash
-git clone [https://github.com/your-username/node-based-image-processor.git](https://github.com/SaanidhyaM/node-based-image-processor.git)
+git clone https://github.com/SaanidhyaM/node-based-image-processor.git
 cd node-based-image-processor
