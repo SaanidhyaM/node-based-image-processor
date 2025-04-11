@@ -22,6 +22,9 @@ class ImageInputNode(BaseNode):
 
     def process(self, data=None):
         return self.image
+    
+    def get_output(self):
+        return self.image
 
     def get_qpixmap(self):
         if self.image is None:

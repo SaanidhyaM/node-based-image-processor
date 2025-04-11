@@ -12,7 +12,7 @@ class BaseNode(QGraphicsItem):
         self.title.setPos(10, -20)
 
     def boundingRect(self):
-        return QRectF(0, 0, 160, 100)
+        return QRectF(0, 0, 180, 100)
 
     def paint(self, painter, option, widget):
         painter.drawRoundedRect(self.boundingRect(), 10, 10)

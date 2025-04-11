@@ -8,6 +8,9 @@ class OutputNode(BaseNode):
 
     def set_image(self, image):
         self.image = image
+    
+    def get_output(self):
+        return self.image
 
     def save_image(self, filename, format="PNG"):
         if self.image is not None:

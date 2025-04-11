@@ -1,70 +1,58 @@
-from core.node import BaseNode
-from PyQt5.QtWidgets import QGraphicsProxyWidget, QLabel, QSlider
-from PyQt5.QtGui import QFont, QColor, QBrush, QPen
+from PyQt5.QtWidgets import QGraphicsProxyWidget, QVBoxLayout, QLabel, QSlider, QWidget
 from PyQt5.QtCore import Qt
-import cv2
 import numpy as np
+from core.node import BaseNode
 
 class BrightnessContrastNode(BaseNode):
-    def __init__(self, x, y, width=180, height=100):
+    def __init__(self):
         super().__init__("Brightness/Contrast")
-        self.setPos(x, y)
-        self.setFlag(self.ItemIsMovable)
-        self.setFlag(self.ItemIsSelectable)
 
-        self.setToolTip("Adjust brightness and contrast")
-        self.original_image = None
-        self.processed_image = None
+        self.widget = QWidget()
+        self.widget.setStyleSheet("background-color: #4B3F72; border-radius: 6px;")
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
-        self.create_controls(width)
+        label = QLabel("Brightness/Contrast")
+        label.setStyleSheet("color: white; font-weight: bold;")
+        layout.addWidget(label)
 
-    def boundingRect(self):
-        return super().boundingRect()
-
-    def paint(self, painter, option, widget):
-        painter.setBrush(QBrush(QColor(80, 80, 120)))
-        painter.setPen(QPen(Qt.NoPen))
-        painter.drawRoundedRect(self.boundingRect(), 10, 10)
-
-    def create_controls(self, width):
         self.brightness_slider = QSlider(Qt.Horizontal)
         self.brightness_slider.setMinimum(-100)
         self.brightness_slider.setMaximum(100)
         self.brightness_slider.setValue(0)
-        self.brightness_slider.setFixedWidth(width - 20)
-        self.brightness_slider.valueChanged.connect(self.update_image)
+        self.brightness_slider.valueChanged.connect(self.process)
+        layout.addWidget(self.brightness_slider)
 
         self.contrast_slider = QSlider(Qt.Horizontal)
         self.contrast_slider.setMinimum(0)
         self.contrast_slider.setMaximum(300)
         self.contrast_slider.setValue(100)
-        self.contrast_slider.setFixedWidth(width - 20)
-        self.contrast_slider.valueChanged.connect(self.update_image)
+        self.contrast_slider.valueChanged.connect(self.process)
+        layout.addWidget(self.contrast_slider)
 
-        brightness_proxy = QGraphicsProxyWidget(self)
-        brightness_proxy.setWidget(self.brightness_slider)
-        brightness_proxy.setPos(10, 25)
+        self.widget.setLayout(layout)
+        self.widget.setFixedSize(200, 130)
 
-        contrast_proxy = QGraphicsProxyWidget(self)
-        contrast_proxy.setWidget(self.contrast_slider)
-        contrast_proxy.setPos(10, 55)
+        proxy = QGraphicsProxyWidget(self)
+        proxy.setWidget(self.widget)
+
+        self.original_image = None
+        self.processed_image = None
 
     def set_input_image(self, image):
         self.original_image = image.copy()
-        self.update_image()
+        self.process()
 
-    def get_output_image(self):
-        return self.processed_image
-
-    def update_image(self):
+    def process(self, _=None):
         if self.original_image is None:
             return
-
         brightness = self.brightness_slider.value()
-        contrast = self.contrast_slider.value() / 100.0  # 1.0 = neutral
-
+        contrast = self.contrast_slider.value() / 100.0
         img = self.original_image.astype(np.float32)
         img = (img - 127.5) * contrast + 127.5 + brightness
         img = np.clip(img, 0, 255).astype(np.uint8)
-
         self.processed_image = img
+
+    def get_output(self):
+        return self.processed_image
