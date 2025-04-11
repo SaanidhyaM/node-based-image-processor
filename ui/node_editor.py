@@ -1,93 +1,101 @@
-# node_editor_ui.py
+# ui/node_editor.py
 
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsPathItem, QGraphicsRectItem, QLabel, QGraphicsProxyWidget, QGraphicsEllipseItem
-from PyQt5.QtGui import QPainter, QPainterPath, QPen, QBrush, QColor, QFont
-from PyQt5.QtCore import Qt, QPointF, QRectF
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog, QHBoxLayout, QGraphicsView, QGraphicsScene, QTextEdit
+from PyQt5.QtGui import QPixmap, QImage
+from nodes.image_input_node import ImageInputNode
+from nodes.output_node import OutputNode
+from nodes.brightness_contrast_node import BrightnessContrastNode
+import cv2
 
-class Socket(QGraphicsEllipseItem):
-    def __init__(self, parent, position, color=QColor("lightblue")):
-        radius = 6
-        super().__init__(-radius, -radius, radius * 2, radius * 2, parent)
-        self.setBrush(QBrush(color))
-        self.setPen(QPen(Qt.NoPen))
-        self.setZValue(2)
-        self.setPos(position)
-
-class Node(QGraphicsRectItem):
-    def __init__(self, x, y, width, height, title, color=QColor(50, 50, 50)):
-        super().__init__(0, 0, width, height)
-        self.setPos(x, y)
-        self.setBrush(QBrush(color))
-        self.setPen(QPen(QColor(100, 100, 100), 2))
-        self.setFlag(QGraphicsItem.ItemIsMovable)
-        self.setFlag(QGraphicsItem.ItemIsSelectable)
-
-        self.title = QLabel(title)
-        self.title.setStyleSheet("color: white; background-color: transparent;")
-        self.title.setFont(QFont("Arial", 10, QFont.Bold))
-        self.proxy = QGraphicsProxyWidget(self)
-        self.proxy.setWidget(self.title)
-        self.proxy.setPos(10, 5)
-
-        self.inputs = []
-        self.outputs = []
-        self.createSockets(width, height)
-
-    def createSockets(self, width, height):
-        self.inputs.append(Socket(self, QPointF(0, height / 2), QColor("deepskyblue")))
-        self.outputs.append(Socket(self, QPointF(width, height / 2), QColor("orange")))
-
-class Connection(QGraphicsPathItem):
-    def __init__(self, start_socket, end_socket):
-        super().__init__()
-        self.start_socket = start_socket
-        self.end_socket = end_socket
-        self.setPen(QPen(QColor(255, 255, 255), 2.0))
-        self.setZValue(1)
-        self.updatePath()
-
-    def updatePath(self):
-        start_pos = self.start_socket.scenePos()
-        end_pos = self.end_socket.scenePos()
-
-        dx = (end_pos.x() - start_pos.x()) * 0.5
-        ctrl1 = QPointF(start_pos.x() + dx, start_pos.y())
-        ctrl2 = QPointF(end_pos.x() - dx, end_pos.y())
-
-        path = QPainterPath(start_pos)
-        path.cubicTo(ctrl1, ctrl2, end_pos)
-        self.setPath(path)
-
-class NodeEditor(QGraphicsView):
+class NodeEditor(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("Node-Based Image Editor")
+        self.setGeometry(100, 100, 1200, 700)
+
+        self.image_node = None
+        self.output_node = OutputNode()
+        self.effect_node = None
+
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QHBoxLayout()
+        left_panel = QVBoxLayout()
+
+        self.load_btn = QPushButton("Load Image")
+        self.save_btn = QPushButton("Save Output")
+        self.add_effect_btn = QPushButton("Add Brightness/Contrast Node")
+        self.image_label = QLabel("Image Preview")
+        self.image_label.setFixedSize(400, 300)
+        self.image_label.setStyleSheet("border: 1px solid gray;")
+        self.meta_display = QTextEdit()
+        self.meta_display.setReadOnly(True)
+
+        self.load_btn.clicked.connect(self.load_image)
+        self.save_btn.clicked.connect(self.save_output)
+        self.add_effect_btn.clicked.connect(self.add_effect_node)
+
+        left_panel.addWidget(self.load_btn)
+        left_panel.addWidget(self.save_btn)
+        left_panel.addWidget(self.add_effect_btn)
+        left_panel.addWidget(self.image_label)
+        left_panel.addWidget(self.meta_display)
+
+        self.canvas = QGraphicsView()
         self.scene = QGraphicsScene()
-        self.setScene(self.scene)
-        self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.ScrollHandDrag)
-        self.setBackgroundBrush(QColor(40, 40, 40))
+        self.canvas.setScene(self.scene)
+        self.canvas.setStyleSheet("background-color: #f0f0f0; border: 1px solid black;")
 
-        self.initUI()
+        layout.addLayout(left_panel, 1)
+        layout.addWidget(self.canvas, 2)
 
-    def initUI(self):
-        node1 = Node(50, 100, 160, 60, "Image Input", QColor(70, 100, 200))
-        node2 = Node(300, 100, 160, 60, "Image Output", QColor(100, 200, 100))
+        self.setLayout(layout)
 
-        self.scene.addItem(node1)
-        self.scene.addItem(node2)
+    def load_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp)")
+        if file_path:
+            self.image_node = ImageInputNode(file_path)
+            pixmap = self.image_node.get_qpixmap()
+            self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), aspectRatioMode=1))
+            self.output_node.set_image(self.image_node.image)
+            self.display_metadata()
 
-        connection = Connection(node1.outputs[0], node2.inputs[0])
-        self.scene.addItem(connection)
+            if self.effect_node:
+                self.effect_node.set_input_image(self.image_node.image)
+                self.update_preview_from_effect()
 
-        # Bind update on movement
-        node1.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
-        node2.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
-        node1.itemChange = self.onNodeMove(connection)
-        node2.itemChange = self.onNodeMove(connection)
+    def display_metadata(self):
+        if self.image_node:
+            meta = self.image_node.metadata
+            text = "\n".join([f"{key}: {value}" for key, value in meta.items()])
+            self.meta_display.setText(text)
 
-    def onNodeMove(self, connection):
-        def itemChange(change, value):
-            if change == QGraphicsItem.ItemPositionChange:
-                connection.updatePath()
-            return value
-        return itemChange
+    def save_output(self):
+        if self.output_node.image is not None:
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "Images (*.png *.jpg *.bmp)")
+            if file_path:
+                self.output_node.save_image(file_path)
+
+    def add_effect_node(self):
+        self.effect_node = BrightnessContrastNode(50, 50)
+        self.scene.addItem(self.effect_node)
+
+        if self.image_node:
+            self.effect_node.set_input_image(self.image_node.image)
+
+        self.effect_node.brightness_slider.valueChanged.connect(self.update_preview_from_effect)
+        self.effect_node.contrast_slider.valueChanged.connect(self.update_preview_from_effect)
+
+    def update_preview_from_effect(self):
+        if self.effect_node:
+            edited_img = self.effect_node.get_output_image()
+            if edited_img is not None:
+                self.output_node.set_image(edited_img)
+
+                rgb_image = cv2.cvtColor(edited_img, cv2.COLOR_BGR2RGB)
+                height, width, channel = rgb_image.shape
+                bytes_per_line = 3 * width
+                qimage = QImage(rgb_image.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(qimage)
+                self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), aspectRatioMode=1))
