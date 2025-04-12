@@ -1,28 +1,49 @@
 # ui/node_editor.py
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog, QHBoxLayout, QGraphicsView, QGraphicsScene, QTextEdit
-from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog, QHBoxLayout, QGraphicsView, QGraphicsScene, QTextEdit, QGraphicsEllipseItem, QGraphicsPathItem
+from PyQt5.QtGui import QPixmap, QImage, QPainterPath, QPen, QColor
+from PyQt5.QtCore import Qt, QPointF
 from nodes.image_input_node import ImageInputNode
 from nodes.output_node import OutputNode
 from nodes.brightness_contrast_node import BrightnessContrastNode
 from nodes.grayscale_node import GrayscaleNode
+from nodes.color_channel_splitter_node import ColorChannelSplitterNode
 import cv2
+
+class ConnectionLine(QGraphicsPathItem):
+    def __init__(self, start_item, end_item):
+        super().__init__()
+        self.start_item = start_item
+        self.end_item = end_item
+        self.setPen(QPen(Qt.white, 2))
+        self.update_path()
+
+    def update_path(self):
+        start_pos = self.start_item.scenePos()
+        end_pos = self.end_item.scenePos()
+        path = QPainterPath()
+        path.moveTo(start_pos)
+        dx = (end_pos.x() - start_pos.x()) * 0.5
+        ctrl1 = QPointF(start_pos.x() + dx, start_pos.y())
+        ctrl2 = QPointF(end_pos.x() - dx, end_pos.y())
+        path.cubicTo(ctrl1, ctrl2, end_pos)
+        self.setPath(path)
 
 class NodeEditor(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Node-Based Image Editor")
         self.setGeometry(100, 100, 1200, 700)
-
         self.image_node = None
         self.output_node = OutputNode()
         self.effect_node = None
         self.gray_node = None
-
+        self.splitter_node = None
+        self.active_nodes = []
+        self.connections = []
         self.init_ui()
 
     def init_ui(self):
-        self.active_nodes = []
         layout = QHBoxLayout()
         left_panel = QVBoxLayout()
 
@@ -30,15 +51,13 @@ class NodeEditor(QWidget):
         self.save_btn = QPushButton("Save Output")
         self.add_effect_btn = QPushButton("Add Brightness/Contrast Node")
         self.add_grayscale_btn = QPushButton("Add Grayscale Node")
+        self.add_splitter_btn = QPushButton("Add Channel Splitter Node")
+        self.remove_node_btn = QPushButton("Remove Last Node")
         self.reset_btn = QPushButton("Reset Nodes")
-        self.reset_btn.clicked.connect(self.reset_nodes)
-        
+
         self.image_label = QLabel("Image Preview")
         self.image_label.setFixedSize(400, 300)
         self.image_label.setStyleSheet("border: 1px solid gray;")
-        self.remove_node_btn = QPushButton("Remove Last Node")
-        self.remove_node_btn.clicked.connect(self.remove_last_node)
-
         self.meta_display = QTextEdit()
         self.meta_display.setReadOnly(True)
 
@@ -46,13 +65,13 @@ class NodeEditor(QWidget):
         self.save_btn.clicked.connect(self.save_output)
         self.add_effect_btn.clicked.connect(self.add_effect_node)
         self.add_grayscale_btn.clicked.connect(self.add_grayscale_node)
+        self.add_splitter_btn.clicked.connect(self.add_splitter_node)
+        self.remove_node_btn.clicked.connect(self.remove_last_node)
+        self.reset_btn.clicked.connect(self.reset_nodes)
 
-        left_panel.addWidget(self.load_btn)
-        left_panel.addWidget(self.save_btn)
-        left_panel.addWidget(self.add_effect_btn)
-        left_panel.addWidget(self.add_grayscale_btn)
-        left_panel.addWidget(self.remove_node_btn)
-        left_panel.addWidget(self.reset_btn)
+        for btn in [self.load_btn, self.save_btn, self.add_effect_btn, self.add_grayscale_btn, self.add_splitter_btn, self.remove_node_btn, self.reset_btn]:
+            left_panel.addWidget(btn)
+
         left_panel.addWidget(self.image_label)
         left_panel.addWidget(self.meta_display)
 
@@ -65,6 +84,18 @@ class NodeEditor(QWidget):
         layout.addWidget(self.canvas, 2)
 
         self.setLayout(layout)
+
+    def create_socket(self, x, y):
+        socket = QGraphicsEllipseItem(-5, -5, 10, 10)
+        socket.setBrush(QColor("#4caf50"))
+        socket.setPos(x, y)
+        self.scene.addItem(socket)
+        return socket
+
+    def connect_nodes(self, output_socket, input_socket):
+        connection = ConnectionLine(output_socket, input_socket)
+        self.scene.addItem(connection)
+        self.connections.append(connection)
 
     def load_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp)")
@@ -80,6 +111,8 @@ class NodeEditor(QWidget):
                 self.update_preview_from_effect()
             if self.gray_node:
                 self.update_preview_from_grayscale()
+            if self.splitter_node:
+                self.update_preview_from_splitter()
 
     def display_metadata(self):
         if self.image_node:
@@ -105,6 +138,57 @@ class NodeEditor(QWidget):
         self.effect_node.brightness_slider.valueChanged.connect(self.update_preview_from_effect)
         self.effect_node.contrast_slider.valueChanged.connect(self.update_preview_from_effect)
 
+    def add_grayscale_node(self):
+        self.gray_node = GrayscaleNode()
+        self.gray_node.setPos(300, 50 + len(self.active_nodes) * 150)
+        self.scene.addItem(self.gray_node)
+        self.active_nodes.append(self.gray_node)
+        self.update_preview_from_grayscale()
+
+    def add_splitter_node(self):
+        self.splitter_node = ColorChannelSplitterNode()
+        self.splitter_node.setPos(550, 50 + len(self.active_nodes) * 150)
+        self.scene.addItem(self.splitter_node)
+        self.active_nodes.append(self.splitter_node)
+
+        if self.image_node:
+            self.splitter_node.set_input_image(self.image_node.image)
+
+        # Hook live preview callback
+        def update_preview_from_channel():
+            output = self.splitter_node.get_output()
+            if output is not None:
+                self.output_node.set_image(output)
+                self.update_preview(output)
+
+        self.splitter_node.on_output_updated = update_preview_from_channel
+        update_preview_from_channel()
+
+    def remove_last_node(self):
+        if self.active_nodes:
+            node = self.active_nodes.pop()
+            self.scene.removeItem(node)
+            self.effect_node = None if isinstance(node, BrightnessContrastNode) else self.effect_node
+            self.gray_node = None if isinstance(node, GrayscaleNode) else self.gray_node
+            self.splitter_node = None if isinstance(node, ColorChannelSplitterNode) else self.splitter_node
+            if self.image_node:
+                self.output_node.set_image(self.image_node.image)
+                self.update_preview(self.image_node.image)
+
+    def reset_nodes(self):
+        if self.effect_node:
+            self.effect_node.brightness_slider.setValue(0)
+            self.effect_node.contrast_slider.setValue(100)
+        if self.gray_node:
+            self.scene.removeItem(self.gray_node)
+            self.gray_node = None
+        if self.splitter_node:
+            self.scene.removeItem(self.splitter_node)
+            self.splitter_node = None
+        if self.image_node:
+            self.output_node.set_image(self.image_node.image)
+            self.update_preview(self.image_node.image)
+
     def update_preview_from_effect(self):
         if self.effect_node:
             base_img = self.image_node.image if self.image_node else None
@@ -119,13 +203,6 @@ class NodeEditor(QWidget):
             if edited_img is not None:
                 self.output_node.set_image(edited_img)
                 self.update_preview(edited_img)
-
-    def add_grayscale_node(self):
-        self.gray_node = GrayscaleNode()
-        self.gray_node.setPos(300, 50 + len(self.active_nodes) * 150)
-        self.scene.addItem(self.gray_node)
-        self.active_nodes.append(self.gray_node)
-        self.update_preview_from_grayscale()
 
     def update_preview_from_grayscale(self):
         if self.gray_node:
@@ -142,26 +219,13 @@ class NodeEditor(QWidget):
                 self.output_node.set_image(gray_img)
                 self.update_preview(gray_img)
 
-    def remove_last_node(self):
-        if self.active_nodes:
-            node = self.active_nodes.pop()
-            self.scene.removeItem(node)
-            self.effect_node = None if isinstance(node, BrightnessContrastNode) else self.effect_node
-            self.gray_node = None if isinstance(node, GrayscaleNode) else self.gray_node
-            if self.image_node:
-                self.output_node.set_image(self.image_node.image)
-                self.update_preview(self.image_node.image)
-
-    def reset_nodes(self):
-        if self.effect_node:
-            self.effect_node.brightness_slider.setValue(0)
-            self.effect_node.contrast_slider.setValue(100)
-        if self.gray_node:
-            self.scene.removeItem(self.gray_node)
-            self.gray_node = None
-        if self.image_node:
-            self.output_node.set_image(self.image_node.image)
-            self.update_preview(self.image_node.image)
+    def update_preview_from_splitter(self):
+        if self.splitter_node:
+            self.splitter_node.set_input_image(self.image_node.image)
+            r_channel = self.splitter_node.get_output("R")
+            if r_channel is not None:
+                self.output_node.set_image(r_channel)
+                self.update_preview(r_channel)
 
     def update_preview(self, img):
         rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
