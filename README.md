@@ -20,8 +20,8 @@ A desktop application for modular, node-based image manipulation. This tool allo
 |------------------|-------------------------------|--------------|
 | Basic            | ✅ Image Input Node            | Implemented |
 |                  | ✅ Output Node                 | Implemented |
-| Processing       | 🔧 Brightness/Contrast Node    | Coming soon |
-|                  | 🔧 Color Channel Splitter      | Coming soon |
+| Processing       | ✅ Brightness/Contrast Node    | Implemented |
+|                  | ✅ Color Channel Splitter      | Implemented |
 |                  | 🔧 Gaussian Blur Node          | Coming soon |
 |                  | 🔧 Threshold Node              | Coming soon |
 |                  | 🔧 Edge Detection Node         | Coming soon |
