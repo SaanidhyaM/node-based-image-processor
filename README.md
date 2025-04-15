@@ -22,9 +22,9 @@ A desktop application for modular, node-based image manipulation. This tool allo
 |                  | ✅ Output Node                 | Implemented |
 | Processing       | ✅ Brightness/Contrast Node    | Implemented |
 |                  | ✅ Color Channel Splitter      | Implemented |
-|                  | 🔧 Gaussian Blur Node          | Coming soon |
+|                  | ✅ Gaussian Blur Node          | Implemented |
 |                  | 🔧 Threshold Node              | Coming soon |
-|                  | 🔧 Edge Detection Node         | Coming soon |
+|                  | ✅ Edge Detection Node         | Implemented |
 |                  | 🔧 Blend Node                  | Coming soon |
 |                  | 🔧 Noise Generation Node       | Coming soon |
 |                  | 🔧 Convolution Filter Node     | Coming soon |
